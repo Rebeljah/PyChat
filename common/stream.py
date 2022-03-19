@@ -1,45 +1,9 @@
 import asyncio
 from asyncio.exceptions import IncompleteReadError
-import json
-from typing import Iterable, Type, Callable
 
 from . import HEADER_SIZE
-
-
-class StreamData:
-    def __repr__(self):
-        return f"{self.__class__.__name__}: {self.__dict__}"
-
-    def to_dict(self):
-        return {'type': self.__class__.__name__, **self.__dict__}
-
-    @classmethod
-    def from_dict(cls, data: dict):
-        """Determine which stream data class to use then new it up w/ input dict"""
-        data_class = type_name_to_class[data['type']]
-        return data_class(**data)
-
-
-class ClientInfo(StreamData):
-    def __init__(self, uid: str, chat_channels: Iterable[str], **kwargs):
-        super().__init__()
-
-        self.uid = uid
-        self.chat_channels = chat_channels
-
-
-class ChatMessage(StreamData):
-    def __init__(self, channel_id, sender_id, text, **kwargs):
-        super().__init__()
-
-        self.channel_id = channel_id
-        self.sender_id = sender_id
-        self.text = text
-
-
-type_name_to_class: dict[str, Type[StreamData]] = {
-    cls.__name__: cls for cls in [ChatMessage, ClientInfo]
-}
+from .events import PubSub
+from .data import StreamData
 
 
 class DataStream:
@@ -66,32 +30,24 @@ class DataStream:
                 bytes=await self.reader.readexactly(HEADER_SIZE),
                 byteorder='big'
             )
-            data: dict = json.loads(await self.reader.readexactly(read_length))
-            return StreamData.from_dict(data)
+            data: bytes = await self.reader.readexactly(read_length)
+            return StreamData.from_json(data)
 
         try:
             while True:
-                await self.parent.handle_data(await read())
+                self.parent.publish_data(await read())
         except (OSError, IncompleteReadError, ConnectionResetError) as e:
             print(f"Handling error while reading from {self} ({e})")
         finally:
-            await self.cleanup()
+            await self.close_connection()
 
     async def write(self, data: StreamData):
         """Send the json as a bytestring to stream"""
-        data = bytes(
-            json.dumps(data.to_dict(), indent=None, separators=(',', ':')),
-            'utf-8'
-        )
+        data = bytes(data.to_json(), 'utf-8')
         header_bytes = len(data).to_bytes(HEADER_SIZE, 'big')
 
         self.writer.writelines([header_bytes, data])
         await self.writer.drain()
-
-    async def cleanup(self):
-        await self.close_connection()
-        self.parent.cleanup()
-        print(f"Cleaned up {self}")
 
     async def close_connection(self):
         self.writer.close()
@@ -104,14 +60,14 @@ class NetworkInterface:
     sending and receiving data to a DataStream"""
     def __init__(self, reader, writer):
         self.stream = DataStream(self, reader, writer)
-        self.data_handlers: dict[Type[StreamData], Callable] = {}
+        self.data_pubsub = PubSub()
 
     def __repr__(self):
         return f"{self.__class__} {self.stream.peername}"
 
-    async def handle_data(self, data: StreamData):
-        callback = self.data_handlers[data.__class__]
-        await callback(data)
+    async def send_data(self, data: StreamData):
+        await self.stream.write(data)
+        print(f"{self} >>> {data}")
 
-    def cleanup(self):
-        print(f"Cleaned up {self} (WARNING! NOT IMPLEMENTED)")
+    def publish_data(self, data: StreamData):
+        self.data_pubsub.publish(data, pass_attrs=False)

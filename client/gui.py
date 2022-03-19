@@ -1,14 +1,11 @@
 import tkinter as tk
 from tkinter import ttk
 import asyncio
-import sys
 
-from chat import ChatApp
-from common.events import PubSub, GUISentMessage
+from common.events import GuiSentMessage
+from client import events
 
 FRAME_RATE = 24
-
-pubsub = PubSub()
 
 
 class MessagesBox(tk.Listbox):
@@ -33,10 +30,9 @@ class GUIContent(ttk.Frame):
 
         self.send_message_btn = tk.Button(
             self, text='Send',
-            command=lambda: pubsub.publish(
-                GUISentMessage(self.message_entry.get())
-            )
-        )
+            command=lambda: events.publish(
+                GuiSentMessage(self.message_entry.get())
+            ))
         self.send_message_btn.pack()
 
 

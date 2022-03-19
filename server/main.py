@@ -1,12 +1,14 @@
 import asyncio
 
-from server_network import ClientInterface
+from server_network import ClientInterface, ChatChannels
 from common import SERVER_IP, PORT
 
 
 async def main():
+    chat_channels = ChatChannels()
+
     server = await asyncio.start_server(
-        client_connected_cb=lambda r, w: ClientInterface(r, w).make_active(),
+        client_connected_cb=chat_channels.add_new_client,
         host=SERVER_IP,
         port=PORT
     )

@@ -1,6 +1,7 @@
-import asyncio
-
-from common.stream import NetworkInterface, ChatMessage, StreamData
+from common.stream import NetworkInterface
+from common.events import ReceivedMessage
+from common.data import MessageData
+from client import events
 
 
 class ServerInterface(NetworkInterface):
@@ -10,20 +11,13 @@ class ServerInterface(NetworkInterface):
 
         self.app = app
 
-        self.data_handlers = {
-            ChatMessage: self.receive_chat_msg,
-        }
-
-    async def send_data(self, data: StreamData):
-        await self.stream.write(data)
-        print(f"{self} >>> {data}")
+        self.data_pubsub.subscribe(MessageData, self.receive_chat_msg)
 
     async def send_chat_msg(self, text, sender_id, channel_id):
-        msg = ChatMessage(channel_id, sender_id, text)
+        msg = MessageData(channel_id, sender_id, text)
         await self.stream.write(msg)
-
         print(f"{self} >>> chat message {msg}")
 
-    async def receive_chat_msg(self, msg: ChatMessage):
+    def receive_chat_msg(self, msg: MessageData):
+        events.publish(ReceivedMessage(msg))
         print(f"{self} <<< chat message {msg}")
-
