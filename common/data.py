@@ -1,38 +1,46 @@
-import json
-from dataclasses import dataclass, asdict, fields
-from typing import Type
+
+from dataclasses import dataclass, asdict, field
 
 
-@dataclass(frozen=True)
+@dataclass
 class StreamData:
-    def to_json(self):
-        data = {'type': self.__class__.__name__, **asdict(self)}
-        return json.dumps(data, indent=None, separators=(',', ':'))
+    __dataclass__: str = field(init=False)
+
+    def __post_init__(self):
+        self.__dataclass__ = self.__class__.__name__
+
+    def as_dict(self):
+        return asdict(self)
 
     @classmethod
-    def from_json(cls, data: bytes):
-        """convert json bytestring to appropriate StreamData object"""
-        data: dict = json.loads(data)
+    def from_dict(cls, d: dict) -> 'StreamData':
+        """Load the dict as StreamData. If any dict contained in d
+        has a '__dataclass__' key, it is recursively converted into StreamData"""
+        data_class = data_classes[d['__dataclass__']]
+        del d['__dataclass__']
 
-        data_class: Type[StreamData] = stream_data_types[data['type']]
-        field_names = set(field.name for field in fields(data_class))
+        for key, val in d.items():
+            if isinstance(val, dict) and '__dataclass__' in val:
+                d[key] = StreamData.from_dict(val)
 
-        return data_class(
-            **{k: v for k, v in data.items() if k in field_names}
-        )
+        return data_class(**d)
 
 
-@dataclass(frozen=True)
+@dataclass
 class ClientData(StreamData):
-    id: str
-
-
-@dataclass(frozen=True)
-class MessageData(StreamData):
     channel_id: str
-    sender_id: str
+    username: str
+
+
+@dataclass
+class MessageData(StreamData):
+    client: ClientData
     text: str
 
 
-data_types = (MessageData, ClientData)
-stream_data_types = {type_.__name__: type_ for type_ in data_types}
+data_classes = {
+    dc.__name__: dc for dc in (
+        MessageData,
+        ClientData,
+    )
+}

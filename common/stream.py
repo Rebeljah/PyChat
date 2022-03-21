@@ -1,5 +1,7 @@
 import asyncio
 from asyncio.exceptions import IncompleteReadError
+import json
+from typing import Type
 
 from . import HEADER_SIZE
 from .events import PubSub
@@ -15,14 +17,16 @@ class DataStream:
         self.reader: asyncio.StreamReader = reader
         self.writer: asyncio.StreamWriter = writer
 
+        self.data_pubsub = PubSub()
+
         self.peername = self.writer.get_extra_info('peername')
 
-        asyncio.create_task(self._listen())
+        self.listen = asyncio.create_task(self._listen())
 
     def __repr__(self):
         return f"{self.__class__}: {self.peername}"
 
-    async def _listen(self):
+    async def _listen(self, decrypt=False):
         """Listen for json messages and use parent functions to handle them"""
         async def read() -> StreamData:
             """parse the json data from stream into a StreamData object"""
@@ -31,23 +35,36 @@ class DataStream:
                 byteorder='big'
             )
             data: bytes = await self.reader.readexactly(read_length)
-            return StreamData.from_json(data)
+
+            if decrypt:  # TODO: implement encryption
+                data = data
+
+            data: dict = json.loads(data)
+            return StreamData.from_dict(data)
 
         try:
             while True:
-                self.parent.publish_data(await read())
+                self.data_pubsub.publish(await read(), pass_attrs=False)
         except (OSError, IncompleteReadError, ConnectionResetError) as e:
             print(f"Handling error while reading from {self} ({e})")
         finally:
             await self.close_connection()
 
-    async def write(self, data: StreamData):
+    async def write(self, data: StreamData, encrypt=False):
         """Send the json as a bytestring to stream"""
-        data = bytes(data.to_json(), 'utf-8')
+        data = json.dumps(data.as_dict(), indent=None, separators=(',', ':'))
+        data = bytes(data, 'utf-8')
+
+        if encrypt:  # TODO: implement encryption
+            data = data
+
         header_bytes = len(data).to_bytes(HEADER_SIZE, 'big')
 
         self.writer.writelines([header_bytes, data])
         await self.writer.drain()
+
+    def subscribe(self, data_type: Type[StreamData], callback):
+        self.data_pubsub.subscribe(data_type, callback)
 
     async def close_connection(self):
         self.writer.close()
@@ -60,7 +77,6 @@ class NetworkInterface:
     sending and receiving data to a DataStream"""
     def __init__(self, reader, writer):
         self.stream = DataStream(self, reader, writer)
-        self.data_pubsub = PubSub()
 
     def __repr__(self):
         return f"{self.__class__} {self.stream.peername}"
@@ -68,6 +84,3 @@ class NetworkInterface:
     async def send_data(self, data: StreamData):
         await self.stream.write(data)
         print(f"{self} >>> {data}")
-
-    def publish_data(self, data: StreamData):
-        self.data_pubsub.publish(data, pass_attrs=False)

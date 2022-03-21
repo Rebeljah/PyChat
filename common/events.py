@@ -1,21 +1,25 @@
 import asyncio
 from collections import defaultdict
 from inspect import iscoroutinefunction
+from dataclasses import dataclass
+
+from .data import MessageData
 
 
+@dataclass
 class Event:
     """Base class for events that can be emitted and subscribed to"""
     pass
 
 
+@dataclass
 class GuiSentMessage(Event):
-    def __init__(self, text):
-        self.text = text
+    text: str
 
 
+@dataclass
 class ReceivedMessage(Event):
-    def __init__(self, message):
-        self.message = message
+    message: MessageData
 
 
 class PubSub:
