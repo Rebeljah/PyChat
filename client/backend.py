@@ -1,48 +1,31 @@
 import asyncio
+from cryptography.fernet import Fernet
+from typing import Optional
 
-from client import EVENTS
-from common.events import GuiSentMessage, ReceivedMessage
-from common.data import MessageData, ClientData
-from common.stream import NetworkInterface
+from client_network import ServerInterface
+from encryption import DHKeyGenerator, create_fernet
+from common.events import PubSub
 
-
-class ServerInterface(NetworkInterface):
-    """Provides methods for communicating with the server"""
-    def __init__(self, app, reader, writer):
-        super().__init__(reader, writer)
-
-        self.app = app
-
-        self.stream.subscribe(MessageData, self.receive_chat_msg)
-
-    def receive_chat_msg(self, msg: MessageData):
-        EVENTS.publish(ReceivedMessage(msg))
-        print(f"{self} <<< chat message {msg}")
-
-    async def send_chat_message(self, text):
-        client_data = ClientData(
-            self.app.client.channel_id, self.app.client.username
-        )
-        await self.send_data(MessageData(client_data, text))
+backend_events = PubSub()
 
 
-class Client:
-    def __init__(self, app, username):
-        self.app = app
+class ChatChannel:
+    def __init__(self):
+        self.dh_key = DHKeyGenerator()
+        self.encryption: Optional[Fernet] = None
 
-        self.username = username
-        self.channels = {'default'}
-        self.channel_id = 'default'
+    def roll_encryption(self, shared_secret: int):
+        """Get a new message encryption context"""
+        self.encryption = create_fernet(shared_secret)
 
 
 class ChatApp:
     """Controls backend app logic"""
     def __init__(self, reader, writer):
-        # create a server interface and send client info to server
+        self.username = 'Pychat User'
+        self.channel_id = 'default'
+        self.chat_channels: dict[str, ChatChannel] = {}
+
         self.server = ServerInterface(self, reader, writer)
-
-        self.client = Client(self, username='NEW USERNAME')
-
-        EVENTS.subscribe(GuiSentMessage, self.server.send_chat_message)
 
         asyncio.create_task(self.server.send_chat_message('ayy lmao'))

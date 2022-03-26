@@ -1,4 +1,5 @@
 from common.events import PubSub
 
 
-EVENTS = PubSub()
+ui_events = PubSub()
+backend_events = PubSub()

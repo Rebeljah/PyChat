@@ -13,7 +13,7 @@ class Event:
 
 
 @dataclass
-class GuiSentMessage(Event):
+class UISentMessage(Event):
     text: str
 
 

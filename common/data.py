@@ -4,7 +4,7 @@ from dataclasses import dataclass, asdict, field
 
 @dataclass
 class StreamData:
-    __dataclass__: str = field(init=False)
+    __dataclass__: str = field(init=False, repr=False)
 
     def __post_init__(self):
         self.__dataclass__ = self.__class__.__name__
@@ -16,7 +16,7 @@ class StreamData:
     def from_dict(cls, d: dict) -> 'StreamData':
         """Load the dict as StreamData. If any dict contained in d
         has a '__dataclass__' key, it is recursively converted into StreamData"""
-        data_class = data_classes[d['__dataclass__']]
+        data_class = DATA_CLASSES[d['__dataclass__']]
         del d['__dataclass__']
 
         for key, val in d.items():
@@ -27,20 +27,22 @@ class StreamData:
 
 
 @dataclass
-class ClientData(StreamData):
+class MessageData(StreamData):
     channel_id: str
     username: str
-
-
-@dataclass
-class MessageData(StreamData):
-    client: ClientData
     text: str
 
 
-data_classes = {
+@dataclass
+class DHPublicKey(StreamData):
+    key: int  # represents a public key in the form g^a or g^a^b or g^a^b^c, etc
+    is_final: bool  # key is ready to make shared secret once all parts are added
+    channel_id: str  # channel which the encryption will be used in
+
+
+DATA_CLASSES = {
     dc.__name__: dc for dc in (
         MessageData,
-        ClientData,
+        DHPublicKey,
     )
 }

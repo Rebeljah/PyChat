@@ -21,12 +21,10 @@ class DataStream:
 
         self.peername = self.writer.get_extra_info('peername')
 
-        self.listen = asyncio.create_task(self._listen())
-
     def __repr__(self):
-        return f"{self.__class__}: {self.peername}"
+        return f"{self.__class__.__name__}{self.peername}"
 
-    async def _listen(self, decrypt=False):
+    async def listen(self):
         """Listen for json messages and use parent functions to handle them"""
         async def read() -> StreamData:
             """parse the json data from stream into a StreamData object"""
@@ -35,9 +33,6 @@ class DataStream:
                 byteorder='big'
             )
             data: bytes = await self.reader.readexactly(read_length)
-
-            if decrypt:  # TODO: implement encryption
-                data = data
 
             data: dict = json.loads(data)
             return StreamData.from_dict(data)
@@ -50,21 +45,20 @@ class DataStream:
         finally:
             await self.close_connection()
 
-    async def write(self, data: StreamData, encrypt=False):
+    async def write(self, data: StreamData):
         """Send the json as a bytestring to stream"""
         data = json.dumps(data.as_dict(), indent=None, separators=(',', ':'))
         data = bytes(data, 'utf-8')
-
-        if encrypt:  # TODO: implement encryption
-            data = data
 
         header_bytes = len(data).to_bytes(HEADER_SIZE, 'big')
 
         self.writer.writelines([header_bytes, data])
         await self.writer.drain()
 
-    def subscribe(self, data_type: Type[StreamData], callback):
-        self.data_pubsub.subscribe(data_type, callback)
+    def data_subscribe(self, data_class: Type[StreamData], callback):
+        """Run a callback when the specified dataclass is received. The received
+        StreamData instance is sent as an argument"""
+        self.data_pubsub.subscribe(data_class, callback)
 
     async def close_connection(self):
         self.writer.close()
@@ -77,10 +71,18 @@ class NetworkInterface:
     sending and receiving data to a DataStream"""
     def __init__(self, reader, writer):
         self.stream = DataStream(self, reader, writer)
+        asyncio.create_task(self.listen())
 
     def __repr__(self):
-        return f"{self.__class__} {self.stream.peername}"
+        return f"{self.__class__.__name__}{self.stream.peername}"
+
+    async def listen(self):
+        await self.stream.listen()
+        self.cleanup()
 
     async def send_data(self, data: StreamData):
         await self.stream.write(data)
         print(f"{self} >>> {data}")
+
+    def cleanup(self):
+        pass

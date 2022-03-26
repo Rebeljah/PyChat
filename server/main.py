@@ -1,6 +1,6 @@
 import asyncio
 
-from server_network import ClientInterface, ChatChannels
+from server_network import ChatChannels
 from common import SERVER_IP, PORT
 
 
@@ -8,7 +8,7 @@ async def main():
     chat_channels = ChatChannels()
 
     server = await asyncio.start_server(
-        client_connected_cb=chat_channels.add_new_client,
+        client_connected_cb=chat_channels.handle_client,
         host=SERVER_IP,
         port=PORT
     )
