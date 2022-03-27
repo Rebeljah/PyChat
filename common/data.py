@@ -1,5 +1,6 @@
-
 from dataclasses import dataclass, asdict, field
+from cryptography.fernet import Fernet
+import json
 
 
 @dataclass
@@ -9,11 +10,17 @@ class StreamData:
     def __post_init__(self):
         self.__dataclass__ = self.__class__.__name__
 
-    def as_dict(self):
+    def as_dict(self) -> dict:
         return asdict(self)
 
+    def as_string(self) -> str:
+        return json.dumps(self.as_dict(), indent=None, separators=(',', ':'))
+
+    def encrypted(self, fernet: Fernet):
+        pass
+
     @classmethod
-    def from_dict(cls, d: dict) -> 'StreamData':
+    def from_dict(cls, d: dict):
         """Load the dict as StreamData. If any dict contained in d
         has a '__dataclass__' key, it is recursively converted into StreamData"""
         data_class = DATA_CLASSES[d['__dataclass__']]
@@ -27,6 +34,12 @@ class StreamData:
 
 
 @dataclass
+class EncryptedData(StreamData):
+    channel_id: str
+    data: str
+
+
+@dataclass
 class MessageData(StreamData):
     channel_id: str
     username: str
@@ -35,14 +48,21 @@ class MessageData(StreamData):
 
 @dataclass
 class DHPublicKey(StreamData):
-    key: int  # represents a public key in the form g^a or g^a^b or g^a^b^c, etc
-    is_final: bool  # key is ready to make shared secret once all parts are added
-    channel_id: str  # channel which the encryption will be used in
+    channel_id: str  # chat channel where exchange is happening
+    is_final: bool  # If True, receiving client will use to create secret
+    key: int  # public key in the form g^a or g^a^b or g^a^b^c, etc...
+
+
+@dataclass
+class DHPublicKeyRequest(StreamData):
+    """Send to client to request their public key for chat channel"""
+    channel_id: str
 
 
 DATA_CLASSES = {
     dc.__name__: dc for dc in (
         MessageData,
         DHPublicKey,
+        DHPublicKeyRequest,
     )
 }

@@ -2,6 +2,7 @@ from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives import hashes
 from cryptography.fernet import Fernet
 import secrets
+import base64
 
 from common import DH_BASE, DH_PRIME
 
@@ -25,8 +26,6 @@ def create_fernet(shared_secret: int):
         salt=None,
         info=None
     )
-    key = hkdf.derive(
-        bytes(shared_secret)
-    )
-
+    key = hkdf.derive(shared_secret.to_bytes(256, 'big'))
+    key = base64.urlsafe_b64encode(key)
     return Fernet(key)

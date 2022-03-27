@@ -1,6 +1,6 @@
 import asyncio
 
-from server_network import ChatChannels
+from chat_network import ChatChannels
 from common import SERVER_IP, PORT
 
 
