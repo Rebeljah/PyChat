@@ -1,10 +1,8 @@
 import asyncio
-import itertools
 from secrets import token_urlsafe
 from collections import deque
-from itertools import islice
 
-from common.data import DHPublicKey, DHPublicKeyRequest, StreamData
+from common.data import DHPublicKey, DHPublicKeyRequest, StreamData, EncryptedData
 from common.stream import DataStream
 
 ChannelID = str
@@ -21,6 +19,7 @@ class Client:
         return f"{self.__class__.__name__}{self.stream.peername}"
 
     async def _listen(self):
+        self.stream.data_subscribe(EncryptedData, lambda data: self.channels[data.channel_id].distribute_data(data))
         await self.stream.listen()
         self.channels.purge_client(self)
 
@@ -56,8 +55,6 @@ class ChatChannel(set[Client]):
         clients = deque(self)
         client: Client
         key: DHPublicKey
-
-        # TODO MEMOIZE THE CLIENT PUBLIC KEYS SOMEHOW TO REDUCE REQUESTS
 
         for _ in range(len(clients)):
             # get public key from first client

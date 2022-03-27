@@ -5,7 +5,9 @@ from typing import Optional
 from encryption import DHKeyGenerator, create_fernet
 from common.events import PubSub
 from common.stream import DataStream
-from common.data import StreamData, MessageData, DHPublicKey, DHPublicKeyRequest
+from common.data import (
+    StreamData, MessageData, DHPublicKey, DHPublicKeyRequest, EncryptedData
+)
 
 backend_events = PubSub()
 ChannelId = str
@@ -13,19 +15,27 @@ ChannelId = str
 
 class ChatChannel:
     def __init__(self, app, uid):
-        self.app = app
+        self.app: 'ChatApp' = app
         self.uid = uid
 
         self.dh_key = DHKeyGenerator()
         self.fernet: Optional[Fernet] = None
 
     def __repr__(self):
-        return f"{self.__class__.__name__}({self.uid})"
+        return f"{self.__class__.__name__} '{self.uid}'"
 
     def roll_encryption(self, shared_secret: int):
         """Get a new message encryption context"""
         self.fernet = create_fernet(shared_secret)
         print(f"Updated encryption for {self}")
+
+        asyncio.create_task(
+            self.app.stream.write(
+                MessageData(self.uid, self.app.username, 'Ayy its encrypted lmao'),
+                encrypt=True,
+                channel_id=self.uid
+            )
+        )
 
 
 class ChatApp:
@@ -37,7 +47,7 @@ class ChatApp:
             'DEFAULTCHANNEL': ChatChannel(self, 'DEFAULTCHANNEL'),
         }
 
-        self.stream = DataStream(reader, writer)
+        self.stream = EncryptedStream(self.chat_channels, reader, writer)
 
         asyncio.create_task(self._listen())
 
@@ -87,5 +97,15 @@ class EncryptedStream(DataStream):
     async def read(self) -> StreamData:
         data: StreamData = await super().read()
 
-    async def write(self, data: StreamData):
-        pass
+        if isinstance(data, EncryptedData):
+            fernet = self.channels[data.channel_id].fernet
+            data = data.decrypt(fernet)
+
+        return data
+
+    async def write(self, data: StreamData, encrypt=False, channel_id=None):
+        if encrypt:
+            fernet = self.channels[channel_id].fernet
+            data = data.encrypted(fernet, channel_id)
+
+        await super().write(data)

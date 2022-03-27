@@ -16,8 +16,14 @@ class StreamData:
     def as_string(self) -> str:
         return json.dumps(self.as_dict(), indent=None, separators=(',', ':'))
 
-    def encrypted(self, fernet: Fernet):
-        pass
+    def encrypted(self, fernet: Fernet, channel_id) -> 'EncryptedData':
+        data = self.as_string()
+
+        data = fernet.encrypt(bytes(data, 'utf-8'))
+
+        data = data.decode('utf-8')
+
+        return EncryptedData(channel_id, data)
 
     @classmethod
     def from_dict(cls, d: dict):
@@ -37,6 +43,15 @@ class StreamData:
 class EncryptedData(StreamData):
     channel_id: str
     data: str
+
+    def decrypt(self, fernet: Fernet) -> StreamData:
+        data = self.data.encode('utf-8')
+
+        data = fernet.decrypt(data)
+
+        data = json.loads(data)
+
+        return StreamData.from_dict(data)
 
 
 @dataclass
@@ -64,5 +79,6 @@ DATA_CLASSES = {
         MessageData,
         DHPublicKey,
         DHPublicKeyRequest,
+        EncryptedData
     )
 }
