@@ -1,25 +1,6 @@
 import asyncio
 from collections import defaultdict
 from inspect import iscoroutinefunction
-from dataclasses import dataclass
-
-from .data import MessageData
-
-
-@dataclass
-class Event:
-    """Base class for events that can be emitted and subscribed to"""
-    pass
-
-
-@dataclass
-class UISentMessage(Event):
-    text: str
-
-
-@dataclass
-class ReceivedMessage(Event):
-    message: MessageData
 
 
 class PubSub:

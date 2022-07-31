@@ -3,7 +3,7 @@ from asyncio.exceptions import IncompleteReadError
 import json
 
 from . import HEADER_SIZE
-from .events import PubSub
+from .pubsub import PubSub
 from .data import StreamData
 from typing import Optional, Type
 

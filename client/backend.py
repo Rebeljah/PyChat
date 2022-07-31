@@ -3,13 +3,11 @@ from cryptography.fernet import Fernet
 from typing import Optional
 
 from encryption import DHKeyGenerator, create_fernet
-from common.events import PubSub
 from common.stream import DataStream
 from common.data import (
     StreamData, MessageData, DHPublicKey, DHPublicKeyRequest, EncryptedData
 )
 
-backend_events = PubSub()
 ChannelId = str
 
 
