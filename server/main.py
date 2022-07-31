@@ -1,7 +1,7 @@
 import asyncio
 
 from chat_network import ChatChannels
-from common import SERVER_IP, PORT
+from common.stream import SERVER_IP, PORT
 
 
 async def main():
