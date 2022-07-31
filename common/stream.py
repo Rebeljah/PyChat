@@ -2,10 +2,14 @@ import asyncio
 from asyncio.exceptions import IncompleteReadError
 import json
 
-from . import HEADER_SIZE
 from .pubsub import PubSub
 from .data import StreamData
 from typing import Optional, Type
+
+# network settings
+SERVER_IP = '127.0.0.1'
+PORT = 8888
+HEADER_SIZE = 6  # bytes
 
 
 class DataStream:
