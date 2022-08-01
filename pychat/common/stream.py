@@ -1,6 +1,8 @@
 import asyncio
 from asyncio.exceptions import IncompleteReadError
 import json
+from inspect import iscoroutinefunction
+from types import coroutine
 
 from .pubsub import PubSub
 from .data import StreamData, Request, Response
@@ -38,6 +40,7 @@ class DataStream:
         data: bytes = await self.reader.readexactly(read_length)
 
         data: dict = json.loads(data)
+
         data: StreamData = StreamData.from_dict(data)
 
         print(f"{self} <<< {data}")
@@ -62,7 +65,7 @@ class DataStream:
                 if isinstance(data, Response):
                     self.handle_response(data)
                 elif isinstance(data, Request):
-                    self.handle_request(data)
+                    await self.handle_request(data)
                 else:
                     self.pubsub.publish(data)
         except (OSError, IncompleteReadError, ConnectionResetError) as e:
@@ -75,23 +78,29 @@ class DataStream:
         StreamData instance is sent as an argument"""
         self.pubsub.subscribe(data_class, callback)
     
-    def register_request_handler(self, type: Request.type, callback: Callable):
-        self.request_handlers[int(type)] = callback
     
-    async def request(self, type: Request.Types, ctx=None) -> StreamData:
+    async def request(self, type: Request.Types, ctx=None, get_resp=True) -> StreamData|None:
         req = Request(type=type, ctx=ctx or {})
+        asyncio.create_task(self.write(req))
 
-        fut = asyncio.Future()
-        self.request_waiters[req.id] = fut
+        # add waiter to be notified when response with matching id received
+        if get_resp:
+            resp_data = asyncio.Future()
+            self.request_waiters[req.id] = resp_data
 
-        await self.write(req)
-        await fut
-
-        del self.request_waiters[req.id]
-        return fut.result()
+            await resp_data
+            del self.request_waiters[req.id]
+            return resp_data.result()
     
-    def handle_request(self, req: Request):
+    def register_request_handler(self, type: Request.Types, callback: Callable):
+        self.request_handlers[int(type)] = callback
+
+    async def handle_request(self, req: Request):
         cb = self.request_handlers[req.type]
+        if iscoroutinefunction(cb):
+            await cb(req)
+        else:
+            cb(req)
     
     async def respond(self, request_id: str, data: StreamData):
         resp = Response(id=request_id, data=data)

@@ -80,12 +80,12 @@ class DHKey(StreamData):
 
 @dataclass
 class Request(StreamData):
-    id: str = field(init=False)
     type: "Request.Types"
     ctx: dict
+    id: str = ''
 
     def __post_init__(self):
-        self.id = token_urlsafe(10)
+        self.id = self.id or token_urlsafe(10)
         return super().__post_init__()
     
     class Types(IntEnum):
