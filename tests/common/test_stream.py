@@ -1,6 +1,7 @@
 import pytest, pytest_asyncio
 import asyncio
 import random
+from enum import IntEnum, auto
 
 from pychat.common.stream import DataStream
 from pychat.common.data import Request
@@ -8,6 +9,12 @@ from pychat.common.data import Request
 IP, PORT = '127.0.0.1', 5000
 N_CLIENTS = 3
 
+
+@pytest.fixture(scope='module')
+def req_type():
+    class ReqTypes(IntEnum):
+        Generic = auto()
+    return ReqTypes.Generic
 
 @pytest_asyncio.fixture
 async def streams() -> list[tuple[DataStream, DataStream]]:
@@ -100,41 +107,43 @@ async def test_stream_can_make_async_callback_on_trigger(stream_pair, stream_dat
 
 
 @pytest.mark.asyncio
-async def test_can_make_request_without_response(stream_pair):
+async def test_can_make_request_without_response(stream_pair, req_type):
     server, client = stream_pair
 
     req_received = asyncio.Event()
-    server.register_request_handler(type=1, callback=lambda req: req_received.set())
+    server.register_request_handler(
+        type=req_type, callback=lambda req: req_received.set()
+    )
 
-    await client.request(type=1, get_resp=False)
+    await client.request(type=req_type, get_resp=False)
     await asyncio.sleep(0.05)
 
     assert req_received.is_set()
 
 @pytest.mark.asyncio
-async def test_can_make_request_with_response(stream_pair, stream_data):
+async def test_can_make_request_with_response(stream_pair, stream_data, req_type):
     server, client = stream_pair
 
     async def respond(req: Request):
         await server.respond(req.id, stream_data)
 
-    server.register_request_handler(type=1, callback=respond)
+    server.register_request_handler(type=req_type, callback=respond)
 
-    resp_data = await client.request(type=1)
+    resp_data = await client.request(type=req_type)
 
     assert resp_data == stream_data
 
 
 @pytest.mark.asyncio
-async def test_can_make_request_with_context_with_response(stream_pair, stream_data):
+async def test_can_make_request_with_context_with_response(stream_pair, stream_data, req_type):
     server, client = stream_pair
 
     async def respond(req: Request):
         assert req.ctx == {'test': 'data'}
         await server.respond(req.id, stream_data)
 
-    server.register_request_handler(type=1, callback=respond)
+    server.register_request_handler(type=req_type, callback=respond)
 
-    resp_data = await client.request(type=1, ctx={'test': 'data'})
+    resp_data = await client.request(type=req_type, ctx={'test': 'data'})
 
     assert resp_data == stream_data
