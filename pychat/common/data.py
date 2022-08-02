@@ -1,8 +1,9 @@
 from dataclasses import dataclass, asdict, field
-from secrets import token_urlsafe
 from cryptography.fernet import Fernet
 import json
 from enum import IntEnum, auto
+
+from .identity import make_id
 
 
 @dataclass
@@ -72,10 +73,8 @@ class ChatMessage(StreamData):
 
 
 @dataclass
-class DHKey(StreamData):
-    channel_id: str  # chat channel where exchange is happening
-    is_final: bool  # If True, receiving client will use to create secret
-    key: int  # public key in the form g^a or g^a^b or g^a^b^c, etc...
+class DHPublicKey(StreamData):
+    value: int  # public key in the form g^a or g^a^b or g^a^b^c, etc...
 
 
 @dataclass
@@ -85,12 +84,19 @@ class Request(StreamData):
     id: str = ''
 
     def __post_init__(self):
-        self.id = self.id or token_urlsafe(10)
+        self.id = self.id or make_id()
         return super().__post_init__()
     
-    class Types(IntEnum):
+    class Server(IntEnum):
+        pass
+    
+    class Client(IntEnum):
         GetDHPublicKey = auto()
         GetDHMixedPublicKey = auto()
+        PostFinalDHMixedPublicKey = auto()
+
+    class Common(IntEnum):
+        pass
 
 
 @dataclass
@@ -102,7 +108,7 @@ class Response(StreamData):
 DATA_CLASSES = {
     dc.__name__: dc for dc in (
         ChatMessage,
-        DHKey,
+        DHPublicKey,
         EncryptedData,
         Request,
         Response,
