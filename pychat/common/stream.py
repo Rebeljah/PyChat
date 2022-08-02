@@ -2,7 +2,7 @@ import asyncio
 from asyncio.exceptions import IncompleteReadError
 import json
 from inspect import iscoroutinefunction
-from types import coroutine
+from enum import IntEnum
 
 from .pubsub import PubSub
 from .data import StreamData, Request, Response
@@ -24,7 +24,7 @@ class DataStream:
 
         self.pubsub = PubSub()
         self.request_waiters: dict[str, asyncio.Future] = {}
-        self.request_handlers: dict[Request.Types, Callable] = {}
+        self.request_handlers: dict[IntEnum, Callable] = {}
 
         self.peername = self.writer.get_extra_info('peername')
 
@@ -58,7 +58,8 @@ class DataStream:
         print(f"{self} >>> {data}")
 
     async def listen(self):
-        """Listen for json messages and use parent functions to handle them"""
+        """Read and handle Request and Responses. If StreamData is passed
+        not wrapped in a Request/Response publish it to the pubusb."""
         try:
             while True:
                 data = await self.read()
@@ -79,23 +80,34 @@ class DataStream:
         self.pubsub.subscribe(data_class, callback)
     
     
-    async def request(self, type: Request.Types, ctx=None, get_resp=True) -> StreamData|None:
+    async def request(self, type: IntEnum, ctx=None, get_resp=True) -> StreamData|None:
+        """Send a request to the paired DataStream and optionally await a
+        response. The context dict ctx is passed in the Request object to the
+        paired DataStream"""
         req = Request(type=type, ctx=ctx or {})
         asyncio.create_task(self.write(req))
 
-        # add waiter to be notified when response with matching id received
-        if get_resp:
-            resp_data = asyncio.Future()
-            self.request_waiters[req.id] = resp_data
+        if not get_resp:
+            return None
 
-            await resp_data
-            del self.request_waiters[req.id]
-            return resp_data.result()
+        # return response data when a response with matching id is received
+        data_fut = asyncio.Future()
+        self.request_waiters[req.id] = data_fut
+
+        await data_fut
+
+        data: StreamData = data_fut.result()
+        del self.request_waiters[req.id]
+
+        return data
     
-    def register_request_handler(self, type: Request.Types, callback: Callable):
-        self.request_handlers[int(type)] = callback
+    def register_request_handler(self, type: IntEnum, callback: Callable):
+        """Configure a callback to use when receiving Requests of the specified
+        type. The callback can be sync or async"""
+        self.request_handlers[type.value] = callback
 
     async def handle_request(self, req: Request):
+        """React to the received Request using the registed callback."""
         cb = self.request_handlers[req.type]
         if iscoroutinefunction(cb):
             await cb(req)
@@ -103,10 +115,13 @@ class DataStream:
             cb(req)
     
     async def respond(self, request_id: str, data: StreamData):
+        """Send StreamData in response to a specific request"""
         resp = Response(id=request_id, data=data)
         await self.write(resp)
     
     def handle_response(self, resp: Response):
+        """Handle a response to a specific Request by setting the awaiting
+        Request waiter Future with the Response StreamData"""
         self.request_waiters[resp.id].set_result(resp.data)
 
     async def close_connection(self):
