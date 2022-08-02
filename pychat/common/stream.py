@@ -70,7 +70,7 @@ class DataStream:
                 else:
                     self.pubsub.publish(data)
         except (OSError, IncompleteReadError, ConnectionResetError) as e:
-            print(f"Handling error while reading from {self} ({e})")
+            pass
         finally:
             await self.close_connection()
 
@@ -128,3 +128,15 @@ class DataStream:
         self.writer.close()
         await self.writer.wait_closed()
         print(f"Closed connection to {self}")
+
+
+class ClientStream(DataStream):
+    """DataStream for communication with a client"""
+    def __init__(self, reader, writer):
+        super().__init__(reader, writer)
+
+
+class ServerStream(DataStream):
+    """DataStream for communication with the server"""
+    def __init__(self, reader, writer):
+        super().__init__(reader, writer)
