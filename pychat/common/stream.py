@@ -3,10 +3,10 @@ from asyncio.exceptions import IncompleteReadError
 import json
 from inspect import iscoroutinefunction
 from enum import IntEnum
-
-from .pubsub import PubSub
-from .data import StreamData, Request, Response
 from typing import Callable, Type
+
+from pychat.common.pubsub import PubSub
+from pychat.common.protocol import StreamData, Request, Response
 
 # network settings
 SERVER_IP = '127.0.0.1'

@@ -4,7 +4,7 @@ import random
 from enum import IntEnum, auto
 
 from pychat.common.stream import DataStream
-from pychat.common.data import Request
+from pychat.common.protocol import Request
 
 IP, PORT = '127.0.0.1', 5000
 N_CLIENTS = 3

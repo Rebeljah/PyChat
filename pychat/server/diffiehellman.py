@@ -1,9 +1,9 @@
 from collections import deque
 from typing import Iterable
 
-from common.stream import DataStream
-from common.data import Request
-from pychat.common.data import DHPublicKey
+from pychat.common.stream import DataStream
+from pychat.common.protocol import Request
+from pychat.common.protocol import DHPublicKey
 
 
 async def dh_key_exchange(encryption_id: str, clients: Iterable[DataStream]):

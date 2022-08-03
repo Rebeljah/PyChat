@@ -1,7 +1,7 @@
 import pytest
 
 from pychat.client.diffiehellman import create_fernet
-from pychat.common.data import ChatMessage
+from pychat.common.protocol import ChatMessage
 
 
 @pytest.fixture

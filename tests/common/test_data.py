@@ -1,7 +1,7 @@
 import pytest
 from cryptography.fernet import Fernet
 
-from pychat.common.data import EncryptedData
+from pychat.common.protocol import EncryptedData
 
 
 def test_can_encrypt_and_decrypt(fernet, stream_data):
