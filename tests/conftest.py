@@ -1,6 +1,6 @@
 import pytest
 
-from pychat.client.encryption import create_fernet
+from pychat.client.diffiehellman import create_fernet
 from pychat.common.data import ChatMessage
 
 
