@@ -2,32 +2,31 @@ from collections import deque
 from typing import Iterable
 
 from pychat.common.stream import DataStream
-from pychat.common.protocol import Request
-from pychat.common.protocol import DHPublicKey
+from pychat.common.protocol import GetDHKey, GetDHMixedKey, PostFinalKey
 
 
-async def dh_key_exchange(encryption_id: str, clients: Iterable[DataStream]):
+async def dh_key_exchange(fernet_id: str, clients: Iterable[DataStream]):
     """Create a shared secret between clients"""
 
-    key: DHPublicKey
+    key: int
 
     def next_client():
         clients.rotate()
         return clients[0]
 
     clients = deque(clients)
-    ctx = {'encryption_id': encryption_id}
+    ctx = {'fernet_id': fernet_id}
 
     for _ in range(len(clients)):
         # get public key from first client
         first_client = clients[0]
-        key = await first_client.request(Request.Client.GetDHPublicKey, ctx)
+        key = await first_client.write(GetDHKey(**ctx))
 
+        # Exchange between intermediate clients
         for _ in range(len(clients) - 2):
-            ctx['other_key'] = key
             client = next_client()
-            key = await client.request(Request.Client.GetDHMixedPublicKey, ctx)
+            key = await client.write(GetDHMixedKey(key=key, **ctx))
 
-        ctx['other_key'] = key
+        # send key to final client to make secret
         final_client = next_client()
-        await final_client.request(Request.Client.PostFinalDHMixedPublicKey, ctx)
+        await final_client.write(PostFinalKey(key=key, **ctx))

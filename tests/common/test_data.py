@@ -1,8 +1,24 @@
-import pytest
-from cryptography.fernet import Fernet
 
-from pychat.common.protocol import EncryptedData
+from pychat.common.protocol import Encryptable, StreamData, register_models, json_to_model
 
 
-def test_can_encrypt_and_decrypt(fernet, stream_data):
-    assert EncryptedData(stream_data, fernet, '1234').decrypt(fernet) == stream_data
+class NestedData(StreamData):
+        data: int
+        
+class TestData(Encryptable):
+    data: str
+    nested: NestedData
+
+register_models(StreamData)
+
+def test_can_encrypt_and_decrypt(fernet):
+    m = TestData(data='hello')
+    assert m.encrypt(fernet, '').decrypt(fernet) == m
+
+
+def test_can_serialize_and_parse():
+    m = TestData(
+        data='hello',
+        nested=NestedData(data=777)
+    )
+    assert json_to_model(m.json()) == m
