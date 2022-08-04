@@ -1,42 +1,38 @@
+
 from typing import Iterable
 
-from .user import User
-from pychat.common.identity import make_id
+from pychat.server.user import User
+from pychat.common.identity import make_uid
 
 
 class ChatRoom:
-    ROOMS: set["ChatRoom"] = set()
-
     def __init__(self, name: str):
-        ChatRoom.ROOMS.add(self)
-
-        self.id = make_id()
+        self.uid = make_uid()
         self.name = name
-
         self.users: dict[str, User] = {}
     
     def add_user(self, user: User):
-        self.users[user.id] = user
+        self.users[user.uid] = user
     
-    def discard_user(self, user_id: str):
-        self.users.pop(user_id, None)
+    def discard_user(self, user_uid: str):
+        self.users.pop(user_uid, None)
 
 
 class ChatRooms:
     def __init__(self):
         self._rooms: dict[str, ChatRoom] = {}
     
-    def __iter__(self):
+    def __iter__(self) -> Iterable[ChatRoom]:
         return iter(self._rooms.values())
     
     def make_room(self, name: str):
         room = ChatRoom(name)
-        self._rooms[room.id] = room
+        self._rooms[room.uid] = room
     
-    def delete_room(self, room_id: str):
-        del self._rooms[room_id]
+    def delete_room(self, room_uid: str):
+        del self._rooms[room_uid]
 
-    def purge_user(self, user_id: str):
+    def purge_user(self, user_uid: str):
         room: ChatRoom
         for room in self:
-            room.discard_user(user_id)
+            room.discard_user(user_uid)

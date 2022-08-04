@@ -1,7 +1,7 @@
 from secrets import token_urlsafe
 
-ID_LENGTH = 10
+ID_LENGTH = 16
 
 
-def make_id(length=ID_LENGTH):
+def make_uid(length=ID_LENGTH):
     return token_urlsafe(length)

@@ -9,20 +9,20 @@ PRIME = 323170060713110073007148766886699519604441026697154840321303454275246551
 BASE = 5
 
 
-def make_secret() -> int:
+def secret_key() -> int:
     return secrets.randbits(1024)
 
 
-def make_public(secret: int) -> int:
-    return pow(BASE, secret, PRIME)
+def public_key(secret_key: int) -> int:
+    return pow(BASE, secret_key, PRIME)
         
 
-def mix_keys(secret: int, public: int) -> int:
+def mix_keys(secret_key: int, public_key: int) -> int:
     """Mix the client's secret key with another public key"""
-    return pow(public, secret, PRIME)
+    return pow(public_key, secret_key, PRIME)
      
 
-def create_fernet(key: int):
+def create_fernet(secret_key: int):
     """Use a secret key to create a Fernet for symmetric encryption"""
     hkdf = HKDF(
         algorithm=hashes.SHA256(),
@@ -30,6 +30,6 @@ def create_fernet(key: int):
         salt=None,
         info=None
     )
-    k: bytes = hkdf.derive(key.to_bytes(256, 'big'))
+    k: bytes = hkdf.derive(secret_key.to_bytes(256, 'big'))
     k: bytes = base64.urlsafe_b64encode(k)
     return Fernet(k)

@@ -2,8 +2,8 @@ import asyncio
 from asyncio import StreamReader, StreamWriter
 
 from pychat.common.stream import SERVER_IP, PORT
-from .user import User, ClientStream
-from .rooms import ChatRooms
+from pychat.server.user import User, ClientStream
+from pychat.server.rooms import ChatRooms
 
 
 class PychatServer:
@@ -13,7 +13,7 @@ class PychatServer:
 
         self._server: asyncio.Server|None = None
     
-    async def serve_forever(self):
+    async def run(self):
         """Start accepting connection and cleanup when done"""
         self._server = await asyncio.start_server(
             self._handle_user,
@@ -34,16 +34,15 @@ class PychatServer:
     async def _handle_user(self, r: StreamReader, w: StreamWriter):
         """Create a new user and start listening for data"""
         user = User(stream=ClientStream(r, w))
-        self.connected[user.id] = user
+        self.connected[user.uid] = user
 
         # cleanup when done listening
         try:
             await user.stream.listen()
         finally:
-            self.purge_user(user.id)
+            self.purge_user(user.uid)
     
     def purge_user(self, user_id: str):
         """Remove references to the user from the server"""
         del self.connected[user_id]
         self.rooms.purge_user(user_id)
-    

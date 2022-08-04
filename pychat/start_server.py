@@ -4,7 +4,7 @@ from pychat.server.server import PychatServer
 
 
 async def main():
-    await PychatServer().serve_forever()
+    await PychatServer().run()
 
 
 if __name__ == '__main__':

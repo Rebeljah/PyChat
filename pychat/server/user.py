@@ -1,10 +1,10 @@
 from pychat.common.stream import ClientStream
-from pychat.common.identity import make_id
+from pychat.common.identity import make_uid
 
 
 class User:
     def __init__(self, stream: ClientStream):
-        self.id = make_id()
+        self.uid = make_uid()
         self.stream = stream
 
     async def disconnect(self):
