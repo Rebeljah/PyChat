@@ -1,17 +1,18 @@
 import asyncio
 from asyncio import StreamReader, StreamWriter
+from functools import partial
 
-from pychat.common.stream import SERVER_IP, PORT
-from pychat.server.user import User, ClientStream
+from pychat.common import request as req
+from pychat.common.stream import SERVER_IP, PORT, DataStream
 from pychat.server.rooms import ChatRooms
+from pychat.server import users
 
 
 class PychatServer:
     def __init__(self):
-        self.connected: dict[str, User] = {}
-        self.rooms = ChatRooms()
-
         self._server: asyncio.Server|None = None
+        self.rooms = ChatRooms()
+        self.users: set[users.User] = set()
     
     async def run(self):
         """Start accepting connection and cleanup when done"""
@@ -27,22 +28,28 @@ class PychatServer:
             finally:
                 await self._cleanup()
 
-    async def _cleanup(self):
-        coros = [user.disconnect() for user in self.connected.values()]
-        await asyncio.gather(*coros)
-        
     async def _handle_user(self, r: StreamReader, w: StreamWriter):
         """Create a new user and start listening for data"""
-        user = User(stream=ClientStream(r, w))
-        self.connected[user.uid] = user
+        user = users.User(DataStream(r, w))
+        self.users.add(user)
 
-        # cleanup when done listening
+        # add request handlers
+        user.stream.register_request_handler(
+            req.PostMessage, self.rooms.on_post_message
+        )
+        user.stream.register_request_handler(
+            req.CreateRoom, partial(self.rooms.on_create_room, user)
+        )
+        user.stream.register_request_handler(
+            req.JoinRoom, partial(self.rooms.on_join_room, user)
+        )
+
         try:
-            await user.stream.listen()
+            await user.listen()
         finally:
-            self.purge_user(user.uid)
-    
-    def purge_user(self, user_id: str):
-        """Remove references to the user from the server"""
-        del self.connected[user_id]
-        self.rooms.purge_user(user_id)
+            self.rooms.purge_user(user)
+            self.users.remove(user)
+
+    async def _cleanup(self):
+        coros = [user.cleanup() for user in self.users]
+        await asyncio.gather(*coros)
