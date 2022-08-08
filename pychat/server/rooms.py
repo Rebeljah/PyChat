@@ -1,6 +1,7 @@
 
 import asyncio
 
+from pychat.server.diffiehellman import dh_Key_exchange
 from pychat.common.utils import make_uid, make_invite_code
 from pychat.common import models
 from pychat.common import request as req
@@ -21,11 +22,16 @@ class ChatRoom:
     
     def add_user(self, user):
         self.users.add(user)
+        self.do_key_exchange()
     
     def remove_user(self, user):
         self.users.remove(user)
+        self.do_key_exchange()
     
-    async def send_message(self, message: models.ChatMessage):
+    def do_key_exchange(self):
+        dh_Key_exchange(self.uid, [u.stream for u in self.users])
+
+    async def send_message(self, message: models.ChatMessage | models.Encrypted):
         r = req.PostMessage(message=message)
         await asyncio.gather(*[u.stream.write(r) for u in self.users])
 
@@ -65,10 +71,15 @@ class ChatRooms:
     def purge_user(self, user):
         for room in tuple(self.rooms.values()):
             if user not in room.users: continue
-            room.remove_user(user)
+            self.remove_user_from_room(user, room.uid)
 
-    async def send_message(self, message: models.ChatMessage):
-        room = self.rooms[message.room_uid]
+    async def send_message(self, message: models.ChatMessage | models.Encrypted):
+        if isinstance(message, models.ChatMessage):
+            room_uid = message.room_uid
+        elif isinstance(message, models.Encrypted):
+            room_uid = message.fernet_id
+
+        room = self.rooms[room_uid]
         await room.send_message(message)
 
     async def on_post_message(self, r: req.PostMessage) -> None:

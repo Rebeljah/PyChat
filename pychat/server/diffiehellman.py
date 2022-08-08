@@ -1,32 +1,38 @@
+import asyncio
 from collections import deque
-from typing import Iterable
+from typing import Iterable, Sequence
 
 from pychat.common.stream import DataStream
-from pychat.common.protocol import GetDHKey, GetDHMixedKey, PostFinalKey
+from pychat.common.request import GetDHKey, GetDHMixedKey, PostFinalKey
 
 
-async def dh_key_exchange(fernet_id: str, clients: Iterable[DataStream]):
-    """Create a shared secret between clients"""
-
-    key: int
-
-    def next_client():
-        clients.rotate()
-        return clients[0]
+def dh_Key_exchange(fernet_uid: str, clients: Iterable[DataStream]):
+    """Created a shared sescret between clients. Creates N orderings where N
+    is the number of clients where each client gets a chance to be the end
+    of the sequence and set their secret key"""
 
     clients = deque(clients)
-    ctx = {'fernet_id': fernet_id}
+    ctx = {'fernet_uid': fernet_uid}
 
     for _ in range(len(clients)):
-        # get public key from first client
-        first_client = clients[0]
-        key = await first_client.write(GetDHKey(**ctx))
+        asyncio.create_task(_exchange(ctx, tuple(clients)))
+        clients.rotate()
 
-        # Exchange between intermediate clients
-        for _ in range(len(clients) - 2):
-            client = next_client()
-            key = await client.write(GetDHMixedKey(key=key, **ctx))
 
-        # send key to final client to make secret
-        final_client = next_client()
-        await final_client.write(PostFinalKey(key=key, **ctx))
+async def _exchange(ctx: dict, clients: Sequence[DataStream]):
+    """Take a sequence of clients and create a shared secret for the last
+    client in the sequence"""
+
+    # get public key from first client
+    first_client = clients[0]
+    r: GetDHKey.Response = await first_client.write(GetDHKey(**ctx))
+    key = r.key
+
+    # Exchange between intermediate clients
+    for client in clients[1:-1]:
+        r: GetDHMixedKey.Response = await client.write(GetDHMixedKey(key=key, **ctx))
+        key = r.key
+
+    # send key to final client to make secret
+    final_client = clients[-1]
+    await final_client.write(PostFinalKey(key=key, **ctx))
