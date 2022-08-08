@@ -5,9 +5,9 @@ from pychat.client.gui.root import GUIRoot
 
 
 async def main():
-    client = PychatClient()
-    gui = GUIRoot()
-    await gui.closed.wait()
+    async with PychatClient():
+        gui = GUIRoot()
+        await gui.closed.wait()
 
 
 if __name__ == '__main__':
