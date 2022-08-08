@@ -7,8 +7,8 @@ class PubSub:
     def __init__(self):
         self.subscribers = defaultdict(set)
 
-    def subscribe(self, trigger, callback):
-        self.subscribers[trigger].add(callback)
+    def subscribe(self, trigger_type, callback):
+        self.subscribers[trigger_type].add(callback)
 
     def publish(self, trigger,):
         """Publish the trigger event to subscribers."""

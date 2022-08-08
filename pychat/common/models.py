@@ -1,9 +1,7 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 import json
 from cryptography.fernet import Fernet
-from typing import Type, Optional
-
-from pychat.common.identity import make_uid
+from typing import Type
 
 
 _MODELS: dict[str, Type[BaseModel]] = {}
@@ -61,46 +59,20 @@ class Encryptable(StreamData):
         )
 
 
-class ChatMessage(Encryptable):
-    text: str
-
-
-class PublicKey(StreamData):
-    value: int
-
-
-### REQUEST AND RESPONSE PROTOCOL ###
-
-class Request(StreamData):
-    uid: str = Field(default_factory=make_uid)
-    context: Optional[dict]
-
-    def needs_response(self):
-        cls = self.__class__
-        return 'Response' in vars(cls)
-
-class Response(StreamData):
-    error: Optional[str]
+class User(StreamData):
+    name: str
     uid: str
 
 
-class KeyRequest(Request):
-    fernet_id: str
+class ChatMessage(Encryptable):
+    user: User
+    text: str
+    room_uid: str
 
-class GetDHKey(KeyRequest):
-    pass
 
-    class Response(Response):
-        key: int
-
-class GetDHMixedKey(KeyRequest):
-    key: int
-
-    class Response(Response):
-        key: int
-
-class PostFinalKey(KeyRequest):
-    key: int
+class ChatRoom(StreamData):
+    uid: str
+    name: str
 
 
 register_models(StreamData)

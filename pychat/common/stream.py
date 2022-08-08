@@ -1,15 +1,17 @@
 import asyncio
 from asyncio.exceptions import IncompleteReadError
-import json
-from inspect import iscoroutinefunction
+from inspect import iscoroutine
 from typing import Callable, Type, Optional
 
-from pychat.common.protocol import json_to_model, StreamData, Request, Response
+from pychat.common.models import json_to_model, StreamData
+from pychat.common.request import Request, Response
 
 # network settings
 SERVER_IP = '127.0.0.1'
 PORT = 8888
 HEADER_SIZE = 6  # bytes
+
+RequestHandler = Callable[[Request], None | Response]
       
 
 class DataStream:
@@ -21,7 +23,7 @@ class DataStream:
         self.writer: asyncio.StreamWriter = writer
 
         self.request_waiters: dict[str, asyncio.Future] = {}
-        self.request_handlers: dict[type[Request], Callable] = {}
+        self.request_handlers: dict[type[Request], RequestHandler] = {}
 
         self.peername = self.writer.get_extra_info('peername')
 
@@ -84,7 +86,7 @@ class DataStream:
         finally:
             await self.close_connection()
     
-    def register_request_handler(self, request_type: Type[Request], callback: Callable):
+    def register_request_handler(self, request_type: Type[Request], callback: RequestHandler):
         """Configure a callback to use when receiving Requests of the specified
         type. The callback can be sync or async"""
         self.request_handlers[request_type] = callback
@@ -92,10 +94,14 @@ class DataStream:
     async def _handle_request(self, request: Request):
         """React to the received Request using the registed callback."""
         cb = self.request_handlers[type(request)]
-        if iscoroutinefunction(cb):
-            await cb(request)
-        else:
-            cb(request)
+        
+        resp = cb(request)
+        if iscoroutine(resp):
+            resp = await resp
+        
+        if isinstance(resp, Response):
+            resp.uid = request.uid
+            await self.write(resp)
     
     def _handle_response(self, response: Response):
         """Handle a response to a specific Request by setting the awaiting
@@ -106,15 +112,3 @@ class DataStream:
         self.writer.close()
         await self.writer.wait_closed()
         print(f"Closed connection to {self}")
-
-
-class ClientStream(DataStream):
-    """DataStream for communication with a client"""
-    def __init__(self, reader, writer):
-        super().__init__(reader, writer)
-
-
-class ServerStream(DataStream):
-    """DataStream for communication with the server"""
-    def __init__(self, reader, writer):
-        super().__init__(reader, writer)
