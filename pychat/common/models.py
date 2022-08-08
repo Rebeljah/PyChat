@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import json
 from cryptography.fernet import Fernet
 from typing import Type
@@ -28,6 +28,9 @@ def json_to_model(json_: str | bytes):
 
 
 class StreamData(BaseModel):
+    def __str__(self):
+        return repr(self)
+
     def json(self, *args, **kwargs):
         d = self.dict(*args, **kwargs)
         d['__name__'] = self.__class__.__qualname__
@@ -37,7 +40,7 @@ class StreamData(BaseModel):
 class Encrypted(StreamData):
     encrypted_type: str
     fernet_id: str
-    ciphertext: str
+    ciphertext: str = Field(repr=False)
 
     def decrypt(self, f: Fernet) -> StreamData:
         ciphertext: bytes = self.ciphertext.encode()

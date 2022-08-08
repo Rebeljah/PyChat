@@ -40,7 +40,6 @@ class DataStream:
 
         data: StreamData = json_to_model(data)
 
-        print(f"{self} <<< {data}")
         return data
 
     async def write(self, data: StreamData) -> Optional[Response]:
@@ -53,8 +52,6 @@ class DataStream:
 
         self.writer.writelines([header, body])
         await self.writer.drain()
-
-        print(f"{self} >>> {data}")
 
         if not isinstance(data, Request) or not data.needs_response():
             return

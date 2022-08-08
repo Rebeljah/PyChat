@@ -1,4 +1,3 @@
-from atexit import register
 from pydantic import Field
 from typing import Optional
 
@@ -25,27 +24,27 @@ class Error(Response):
 
 # diffie hellman
 class KeyRequest(Request):
-    fernet_id: str
+    fernet_uid: str
 
 class GetDHKey(KeyRequest):
     pass
 
     class Response(Response):
-        key: int
+        key: int = Field(repr=False)
 
 class GetDHMixedKey(KeyRequest):
-    key: int
+    key: int = Field(repr=False)
 
     class Response(Response):
-        key: int
+        key: int = Field(repr=False)
 
 class PostFinalKey(KeyRequest):
-    key: int
+    key: int = Field(repr=False)
 
 
 # messaging requests
 class PostMessage(Request):
-    message: models.ChatMessage
+    message: models.ChatMessage | models.Encrypted
 
 
 # room creation / joining
