@@ -1,5 +1,6 @@
 
 import asyncio
+from functools import partial
 
 from pychat.server.diffiehellman import dh_Key_exchange
 from pychat.common.utils import make_uid, make_invite_code
@@ -31,7 +32,7 @@ class ChatRoom:
     def do_key_exchange(self):
         dh_Key_exchange(self.uid, [u.stream for u in self.users])
 
-    async def send_message(self, message: models.ChatMessage | models.Encrypted):
+    async def broadcast_messaage(self, message: models.ChatMessage | models.Encrypted):
         r = req.PostMessage(message=message)
         await asyncio.gather(*[u.stream.write(r) for u in self.users])
 
@@ -43,6 +44,13 @@ class ChatRooms:
     def __init__(self):
         self.invite_codes: dict[str, ChatRoom] = {}
         self.rooms: dict[str, ChatRoom] = {}
+    
+    def register_user(self, user: users.User):
+        user.stream.register_request_handlers(
+            (req.PostMessage, self.on_post_message),
+            (req.CreateRoom, partial(self.on_create_room, user)),
+            (req.JoinRoom, partial(self.on_join_room, user)),
+        )
 
     def make_room(self, name: str) -> ChatRoom:
         room = ChatRoom(name)
@@ -80,7 +88,7 @@ class ChatRooms:
             room_uid = message.fernet_id
 
         room = self.rooms[room_uid]
-        await room.send_message(message)
+        await room.broadcast_messaage(message)
 
     async def on_post_message(self, r: req.PostMessage) -> None:
         await self.send_message(r.message)

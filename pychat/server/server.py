@@ -1,6 +1,5 @@
 import asyncio
 from asyncio import StreamReader, StreamWriter
-from functools import partial
 
 from pychat.common import request as req
 from pychat.common.stream import SERVER_IP, PORT, DataStream
@@ -20,7 +19,7 @@ class PychatServer:
             self._handle_user,
             host=SERVER_IP, port=PORT
         )
-        
+
         # start serving then cleanup
         async with self._server:
             try:
@@ -33,16 +32,7 @@ class PychatServer:
         user = users.User(DataStream(r, w))
         self.users.add(user)
 
-        # add request handlers
-        user.stream.register_request_handler(
-            req.PostMessage, self.rooms.on_post_message
-        )
-        user.stream.register_request_handler(
-            req.CreateRoom, partial(self.rooms.on_create_room, user)
-        )
-        user.stream.register_request_handler(
-            req.JoinRoom, partial(self.rooms.on_join_room, user)
-        )
+        self.rooms.register_user(user)
 
         try:
             await user.listen()
