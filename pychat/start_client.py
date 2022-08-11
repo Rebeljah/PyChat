@@ -1,13 +1,13 @@
 import asyncio
 
-from pychat.client.client import PychatClient
+from pychat.client.client import start_client
 from pychat.client.gui.root import GUIRoot
 
 
 async def main():
-    async with PychatClient():
-        gui = GUIRoot()
-        await gui.closed.wait()
+    gui = GUIRoot()
+    await start_client()
+    await gui.closed.wait()
 
 
 if __name__ == '__main__':
