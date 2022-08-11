@@ -1,7 +1,7 @@
 import asyncio
 from asyncio.exceptions import IncompleteReadError
 from inspect import iscoroutine
-from typing import Callable, Type, Optional
+from typing import Callable, Type, Optional, Union, Coroutine
 
 from pychat.common.models import json_to_model, StreamData
 from pychat.common.request import Request, Response
@@ -11,7 +11,9 @@ SERVER_IP = '127.0.0.1'
 PORT = 8888
 HEADER_SIZE = 6  # bytes
 
+RequestType = Type[Request]
 RequestHandler = Callable[[Request], None | Response]
+RequestTypeAndHandler = tuple[RequestType, RequestHandler]
       
 
 class DataStream:
@@ -23,24 +25,45 @@ class DataStream:
         self.writer: asyncio.StreamWriter = writer
 
         self.request_waiters: dict[str, asyncio.Future] = {}
-        self.request_handlers: dict[type[Request], RequestHandler] = {}
+        self.request_handlers: dict[RequestType, RequestHandler] = {}
 
         self.peername = self.writer.get_extra_info('peername')
 
     def __repr__(self):
         return f"{self.__class__.__name__}{self.peername}"
 
+    async def _handle_request(self, request: Request):
+        """Call the request handler callback with the request as an argument.
+        If the request handler returned a Response, write the response back to
+        the paired stream."""
+        cb = self.request_handlers[type(request)]
+        resp: None | Response | Coroutine = cb(request)
+
+        # if the handler returned a coroutine, await it
+        if iscoroutine(resp):
+            resp: None | Response = await resp
+        
+        # send any response back to the requester
+        if isinstance(resp, Response):
+            resp.uid = request.uid
+            await self.write(resp)
+
+    def _handle_response(self, resp: Response):
+        """Handle a response to a specific Request by setting the awaiting
+        Request waiter Future with the Response StreamData"""
+        resp_future = self.request_waiters[resp.uid]
+        resp_future.set_result(resp)
+
     async def _read(self) -> StreamData:
         """parse the json data from stream into a StreamData object"""
-        read_length = int.from_bytes(
+        # get body length from header
+        body_length = int.from_bytes(
             bytes=await self.reader.readexactly(HEADER_SIZE),
             byteorder='big'
         )
-        data: bytes = await self.reader.readexactly(read_length)
+        body: bytes = await self.reader.readexactly(body_length)
 
-        data: StreamData = json_to_model(data)
-
-        return data
+        return json_to_model(body)
 
     async def write(self, data: StreamData) -> Optional[Response]:
         """Send the StreamData to the paired stream. If the StreamData is
@@ -58,10 +81,11 @@ class DataStream:
         
         request: Request = data
 
-        # return response data when a response with matching id is received
+        # add a future to request waiters to be set when a response is received
         response = asyncio.Future()
         self.request_waiters[request.uid] = response
 
+        # wait for the response future to be set
         try:
             await response
         finally:
@@ -83,27 +107,16 @@ class DataStream:
         finally:
             await self.close_connection()
     
-    def register_request_handler(self, request_type: Type[Request], callback: RequestHandler):
+    def register_request_handler(self, type_: RequestType, cb: RequestHandler):
         """Configure a callback to use when receiving Requests of the specified
         type. The callback can be sync or async"""
-        self.request_handlers[request_type] = callback
-
-    async def _handle_request(self, request: Request):
-        """React to the received Request using the registed callback."""
-        cb = self.request_handlers[type(request)]
-        
-        resp = cb(request)
-        if iscoroutine(resp):
-            resp = await resp
-        
-        if isinstance(resp, Response):
-            resp.uid = request.uid
-            await self.write(resp)
+        self.request_handlers[type_] = cb
     
-    def _handle_response(self, response: Response):
-        """Handle a response to a specific Request by setting the awaiting
-        Request waiter Future with the Response StreamData"""
-        self.request_waiters[response.uid].set_result(response)
+    def register_request_handlers(self, *handlers: tuple[RequestTypeAndHandler]):
+        """Convencience function to multiple multiple request handlers with
+        a single function call"""
+        for type_, handler in handlers:
+            self.register_request_handler(type_, handler)
 
     async def close_connection(self):
         self.writer.close()
