@@ -29,17 +29,17 @@ class ChatRooms:
     def __init__(self, stream: DataStream):
         self.rooms: dict[str, ChatRoom] = {}
         self.stream = stream
-
+    
+    def _register_request_handlers(self):
         self.stream.register_request_handler(req.GetDHKey, self.on_get_dh_key)
         self.stream.register_request_handler(req.GetDHMixedKey, self.on_get_dh_mixed_key)
         self.stream.register_request_handler(req.PostFinalKey, self.on_post_dh_final_key)
-
+        self.stream.register_request_handler(req.PostMessage, self.on_message_received)
+    
+    def _register_event_handlers(self):
         events.pubsub.subscribe(events.CreateRoom, self.on_create_room)
         events.pubsub.subscribe(events.JoinRoom, self.on_join_room)
-
         events.pubsub.subscribe(events.SendMessage, self.on_send_message)
-
-        self.stream.register_request_handler(req.PostMessage, self.on_message_received)
     
     def add_room(self, room: models.ChatRoom):
         room = ChatRoom(room.name, room.uid)
