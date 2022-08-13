@@ -29,6 +29,9 @@ class ChatRooms:
     def __init__(self, stream: DataStream):
         self.rooms: dict[str, ChatRoom] = {}
         self.stream = stream
+
+        self._register_request_handlers()
+        self._register_event_handlers()
     
     def _register_request_handlers(self):
         self.stream.register_request_handler(req.GetDHKey, self.on_get_dh_key)
