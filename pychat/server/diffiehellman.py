@@ -1,18 +1,23 @@
 import asyncio
 from collections import deque
+import random
 from typing import Iterable, Sequence
 
 from pychat.common.stream import DataStream
-from pychat.common.request import GetDHKey, GetDHMixedKey, PostFinalKey
+from pychat.common.request import GetDHKey, GetDHMixedKey, PostFinalKey, RegenerateDHKeyPair
 
 
-def dh_Key_exchange(fernet_uid: str, clients: Iterable[DataStream]):
+async def dh_Key_exchange(fernet_uid: str, clients: Iterable[DataStream]):
     """Created a shared sescret between clients. Creates N orderings where N
     is the number of clients where each client gets a chance to be the end
     of the sequence and set their secret key"""
 
-    clients = deque(clients)
     ctx = {'fernet_uid': fernet_uid}
+    clients = deque(clients)
+
+    # prevents re-use of old public keys as shared secret (issue#1)
+    # (ABC -> A'B) instead of (ABC -> AB)
+    await random.choice(clients).write(RegenerateDHKeyPair(**ctx)) # A -> A'
 
     for _ in range(len(clients)):
         asyncio.create_task(_exchange(ctx, tuple(clients)))

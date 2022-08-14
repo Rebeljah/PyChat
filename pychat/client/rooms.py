@@ -10,9 +10,14 @@ class ChatRoom:
         self.name = name
         self.uid = uid
         
-        self.dh_secret: int = dh.secret_key()
-        self.dh_public: int = dh.public_key(self.dh_secret)
+        self.dh_secret = self.dh_public = None
+        self.generate_keys()
+        
         self.dh_fernet = None
+    
+    def generate_keys(self) -> None:
+        self.dh_secret = dh.secret_key()
+        self.dh_public = dh.public_key(self.dh_secret)
     
     def mix_dh_public(self, dh_public: int) -> int:
         return dh.mix_keys(self.dh_secret, dh_public)
@@ -34,10 +39,13 @@ class ChatRooms:
         self._register_event_handlers()
     
     def _register_request_handlers(self):
-        self.stream.register_request_handler(req.GetDHKey, self.on_get_dh_key)
-        self.stream.register_request_handler(req.GetDHMixedKey, self.on_get_dh_mixed_key)
-        self.stream.register_request_handler(req.PostFinalKey, self.on_post_dh_final_key)
-        self.stream.register_request_handler(req.PostMessage, self.on_message_received)
+        self.stream.register_request_handlers(
+            (req.GetDHKey, self.on_get_dh_key),
+            (req.GetDHMixedKey, self.on_get_dh_mixed_key),
+            (req.PostFinalKey, self.on_post_dh_final_key),
+            (req.PostMessage, self.on_message_received),
+            (req.RegenerateDHKeyPair, self.on_regenerate_dh_key_pair),
+        )
     
     def _register_event_handlers(self):
         events.pubsub.subscribe(events.CreateRoom, self.on_create_room)
@@ -123,3 +131,10 @@ class ChatRooms:
             msg: models.ChatMessage = msg.decrypt(room.dh_fernet)
 
         events.pubsub.publish(events.MessageReceived(message=msg))
+    
+    async def on_regenerate_dh_key_pair(self, r: req.RegenerateDHKeyPair) -> req.Response:
+        """Tell the room with the matching uid to regenerate its public/private DH keys"""
+        room = self.rooms[r.fernet_uid]
+        room.generate_keys()
+        # return an empty response to let the server know it was done
+        return req.Response()

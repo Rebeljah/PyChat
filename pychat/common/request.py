@@ -41,6 +41,10 @@ class GetDHMixedKey(KeyRequest):
 class PostFinalKey(KeyRequest):
     key: int = Field(repr=False)
 
+class RegenerateDHKeyPair(KeyRequest):
+    class Response(Response):
+        pass
+
 
 # messaging requests
 class PostMessage(Request):
