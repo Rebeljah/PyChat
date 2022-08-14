@@ -30,7 +30,8 @@ class ChatRoom:
         self.do_key_exchange()
     
     def do_key_exchange(self):
-        dh_Key_exchange(self.uid, [u.stream for u in self.users])
+        streams = [u.stream for u in self.users]
+        asyncio.create_task(dh_Key_exchange(self.uid, streams))
 
     async def broadcast_messaage(self, message: models.ChatMessage | models.Encrypted):
         r = req.PostMessage(message=message)
