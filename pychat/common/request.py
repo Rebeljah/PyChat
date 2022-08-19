@@ -67,5 +67,4 @@ class JoinRoom(Request):
         room: models.ChatRoom
 
 
-models.register_models(Request)
-models.register_models(Response)
+models.register_models(models.StreamData)
